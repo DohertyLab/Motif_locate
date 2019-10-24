@@ -1,0 +1,105 @@
+##8mers motif file on git
+system("scanMotifGenomeWide.pl 8mers_AT.motifs tair10 -bed > 8mers_locations.bed")
+
+Find_Motif_inGene<-function(Feature_locs, OneMotif_locs){
+  feature_list=lapply(unique(Feature_locs[,4]),function(x) Feature_locs[which(Feature_locs[,4]==x),])
+  names(feature_list)=unique(Feature_locs[,4])
+  feature_list=lapply(feature_list,function(y) lapply(unique(y[,5]),function(x) y[which(y[,5]==x),]))
+  
+  OneMotif_list=lapply(unique(OneMotif_locs[,5]),function(x) OneMotif_locs[which(OneMotif_locs[,5]==x),])
+  names(OneMotif_list)=unique(OneMotif_locs[,5])
+  OneMotif_list=lapply(OneMotif_list,function(y) lapply(unique(y[,2]),function(x) y[which(y[,2]==x),]))
+  
+  
+  for(i in names(OneMotif_list)){
+    names_mo_list=NULL
+    for(j in 1:length(OneMotif_list[[i]])){
+      names_mo_list=c(names_mo_list,unique(OneMotif_list[[i]][[j]][,2]))
+    }
+    names(OneMotif_list[[i]])=names_mo_list
+  }
+  for(i in names(feature_list)){
+    names_mo_list=NULL
+    for(j in 1:length(feature_list[[i]])){
+      names_mo_list=c(names_mo_list,unique(feature_list[[i]][[j]][,5]))
+    }
+    names(feature_list[[i]])=names_mo_list
+  }
+  
+  feature_list[[1]]=feature_list[[1]][names(OneMotif_list[[1]])]
+  feature_list[[2]]=feature_list[[2]][names(OneMotif_list[[2]])]
+  OneMotif_list[[1]]=OneMotif_list[[1]][names(feature_list[[1]])]
+  OneMotif_list[[2]]=OneMotif_list[[2]][names(feature_list[[2]])]
+  
+  if (is.null(feature_list[[1]][[1]])){
+    feature_list[[1]][[1]]=data.frame(start=0,stop=0,TSS=0,strand="-",chr="1")
+    names(feature_list[[1]])=c("1")
+  }
+  if (is.null(feature_list[[2]][[1]])){
+    feature_list[[2]][[1]]=data.frame(start=0,stop=0,TSS=0,strand="+",chr="1")
+    names(feature_list[[2]])=c("1")
+  }
+  
+  if (is.null(OneMotif_list[[1]][[1]])){
+    OneMotif_list[[1]][[1]]=data.frame(TF="Nope",Chr="1",start=0,stop=0,strand="-")
+    names(OneMotif_list[[1]])=c("1")
+  }
+  if (is.null(OneMotif_list[[2]][[1]])){
+    OneMotif_list[[2]][[1]]=data.frame(TF="Nope",Chr="1",start=0,stop=0,strand="+")
+    names(OneMotif_list[[2]])=c("1")
+  }
+  
+  is_it_in=vector("list",2)
+  names(is_it_in)=c("+","-")
+  for(i in names(is_it_in)){
+    empty_list=vector("list",7)
+    is_it_in[[i]]<-empty_list
+    names(is_it_in[[i]])<-c("1","2","3","4","5","Mt","Pt")
+  }
+  
+  for(i in names(feature_list)){
+    print(i)
+    for(j in names(feature_list[[i]])){
+      print(j)
+      is_it_in[[i]][[j]]=apply(OneMotif_list[[i]][[j]],1,function(x) apply(feature_list[[i]][[j]],1,function(y) InUTR(UTR_coord = y, Motif_coord = x)))
+    }
+  }
+  is_it_in=lapply(is_it_in,function(x) lapply(x,function(y) which(!is.na(y)==T,arr.ind = T)))
+  return(is_it_in)
+}
+
+
+InUTR<-function(UTR_coord, Motif_coord){
+  if(UTR_coord[1]==0){
+    NA
+  }else{
+    ifelse(UTR_coord[1]<Motif_coord[3] & UTR_coord[2]>Motif_coord[4],
+           yes=Motif_coord[1], no = NA)
+  }
+}
+
+
+feature_mat_UTR<-matrix(data = 0,ncol = 501,nrow = 32833)
+rownames(feature_mat_UTR)=rownames(feats)
+colnames(feature_mat_UTR)<-names(motifs_in_genes5UTR)
+
+for(i in colnames(feature_mat_UTR)){
+  print(i)
+  temp_table=table(motifs_in_genes5UTR[[i]])
+  rownum_intable=sapply(names(temp_table),function(x) which(x==rownames(feature_mat_UTR)))
+  feature_mat_UTR[rownum_intable,i]<-temp_table
+}
+save(feature_mat_UTR, file = "feature_mat_UTR.rda")
+
+feature_mat_promoter<-matrix(data = 0,ncol = 501,nrow = 32833)
+rownames(feature_mat_promoter)=rownames(feats)
+colnames(feature_mat_promoter)<-names(motifs_in_genePromoter)
+
+for(i in colnames(feature_mat_promoter)){
+  print(i)
+  temp_table=table(motifs_in_genePromoter[[i]])
+  rownum_intable=sapply(names(temp_table),function(x) which(x==rownames(feature_mat_promoter)))
+  feature_mat_promoter[rownum_intable,i]<-temp_table
+}
+
+save(feature_mat_promoter, file = "feature_mat_promoter10kb.rda")
